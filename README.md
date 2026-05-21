@@ -98,4 +98,4 @@ All logs print to the terminal where you ran `python main.py`. Watch it live to 
 
 ## Coming Soon 🛒
 
-Links to buy the albums you identify — directly from where you'd actually want to buy them. Stay tuned.
+Links to buy the albums I built this to identify — directly from the place you'd actually want to buy them. Stay tuned.
