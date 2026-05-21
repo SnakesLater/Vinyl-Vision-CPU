@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Record Catalog</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 10px; font-size: 2em; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+
+        /* Drop Zone */
+        #drop-zone {
+            border: 3px dashed #4a90d9;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: rgba(74, 144, 217, 0.1);
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        #drop-zone.dragover {
+            background: rgba(74, 144, 217, 0.2);
+            border-color: #66a3ff;
+            transform: scale(1.02);
+        }
+        #drop-zone p { font-size: 1.2em; }
+
+        /* Preview */
+        #preview-container { display: none; text-align: center; margin-bottom: 20px; }
+        #preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+        }
+
+        /* Progress bar */
+        #progress-container { display: none; margin-bottom: 25px; }
+        #progress-track {
+            background: #334155;
+            border-radius: 8px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        #progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4a90d9, #66a3ff);
+            transition: width 0.4s ease;
+            border-radius: 8px;
+        }
+        #progress-label {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75em;
+            color: #475569;
+        }
+        .progress-steps .step.active { color: #66a3ff; font-weight: 600; }
+        .progress-steps .step.done { color: #4ade80; }
+
+        /* Results */
+        #search-results { display: none; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 20px; }
+
+        /* Candidate rows */
+        .candidate-row {
+            display: flex; align-items: center; gap: 15px;
+            background: rgba(255,255,255,0.08); border-radius: 8px;
+            padding: 12px; margin-bottom: 10px; cursor: pointer;
+            border: 2px solid transparent; transition: all 0.2s;
+        }
+        .candidate-row:hover { background: rgba(74,144,217,0.15); }
+        .candidate-row.selected { background: rgba(74,144,217,0.25); border-color: #4a90d9; }
+        .candidate-thumb { width: 80px; height: 80px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: #334155; }
+        .candidate-thumb[src=""] { display: none; }
+        .candidate-info { flex: 1; min-width: 0; }
+        .candidate-artist { font-weight: 600; color: #e2e8f0; }
+        .candidate-title { color: #66a3ff; font-size: 0.95em; }
+        .candidate-year { color: #818cf8; font-size: 0.8em; margin-top: 2px; }
+        .match-pct { color: #4ade80; font-size: 0.85em; font-weight: 600; margin-left: 8px; }
+        .index-badge {
+            display: inline-block;
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+            font-size: 0.7em;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-weight: 600;
+        }
+        .selected-label { color: #4ade80; font-size: 0.8em; font-weight: 600; margin-left: 10px; }
+
+        /* Metadata */
+        #metadata-display { display: none; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 20px; margin-top: 20px; }
+        #metadata-display h3 { color: #4a90d9; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .metadata-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .metadata-item { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 6px; }
+        .metadata-item .label { color: #888; font-size: 0.8em; display: block; margin-bottom: 5px; }
+        .metadata-item .value { color: #fff; }
+
+        /* Form */
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; color: #aaa; }
+        input, select {
+            width: 100%; padding: 10px; border-radius: 6px;
+            border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 1em;
+        }
+        button {
+            background: linear-gradient(135deg, #4a90d9, #357abd);
+            color: white; border: none; padding: 12px 24px;
+            border-radius: 6px; cursor: pointer; font-size: 1em; margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(74,144,217,0.4); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* Catalog stats */
+        #catalog-stats { text-align: center; padding: 20px; background: rgba(74,144,217,0.1); border-radius: 10px; margin-top: 20px; }
+
+        .error   { background: rgba(239,68,68,0.2); border-left: 4px solid #ef4444; color: #fca5a5; padding: 15px; border-radius: 6px; margin: 10px 0; }
+        .success { background: rgba(74,144,217,0.2); border-left: 4px solid #4a90d9; padding: 15px; border-radius: 6px; margin: 10px 0; }
+
+        /* Fallback manual search */
+        #fallback-search { display: none; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .fallback-row { display: flex; gap: 10px; margin: 15px 0; }
+        .fallback-row input { flex: 1; }
+        #fallback-message { color: #fbbf24; font-size: 0.9em; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Record Catalog</h1>
+        <p class="subtitle">Drag & Drop album art &rarr; Identify &rarr; Catalog</p>
+
+        <!-- Drop Zone -->
+        <div id="drop-zone">
+            <p><strong>Drag & drop an album cover image here</strong></p>
+            <p style="font-size: 0.8em; color: #888;">or click to browse</p>
+            <input type="file" id="file-input" accept="image/*" style="display: none;" />
+        </div>
+
+        <!-- Preview -->
+        <div id="preview-container">
+            <img id="preview-image" alt="Album preview" />
+
+            <!-- Progress Bar -->
+            <div id="progress-container">
+                <div id="progress-track"><div id="progress-fill"></div></div>
+                <div id="progress-label">Analyzing cover art...</div>
+                <div class="progress-steps">
+                    <span class="step" id="step-analyze">Analyze</span>
+                    <span class="step" id="step-search">Search MB</span>
+                    <span class="step" id="step-rank">Rank</span>
+                    <span class="step" id="step-done">Done</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="search-results"></div>
+
+        <!-- Fallback Manual Search -->
+        <div id="fallback-search">
+            <div id="fallback-message">Could not auto-identify the album.</div>
+            <p style="color:#aaa; font-size:0.9em;">Enter artist &amp; title to search MusicBrainz:</p>
+            <div class="fallback-row">
+                <input type="text" id="fb-artist" placeholder="Artist name" />
+                <input type="text" id="fb-title" placeholder="Album title" />
+            </div>
+            <button id="fb-search-btn">Search MusicBrainz</button>
+            <div class="error" id="fb-error" style="display:none;"></div>
+        </div>
+
+        <!-- Metadata / Catalog Form -->
+        <div id="metadata-display">
+            <h3>Full Metadata (Ready to Catalog)</h3>
+            <div class="metadata-grid" id="metadata-grid"></div>
+
+            <div class="form-group">
+                <label>Additional Notes (optional)</label>
+                <input type="text" id="notes" placeholder="Collection notes&hellip;" />
+            </div>
+            <div class="form-group">
+                <label>Condition Grade</label>
+                <select id="condition">
+                    <option value="NM">Near Mint (NM)</option>
+                    <option value="M">Mint (M)</option>
+                    <option value="EX">Excellent (EX)</option>
+                    <option value="VG">Very Good (VG)</option>
+                    <option value="GD">Good (GD)</option>
+                    <option value="FAIR">Fair</option>
+                    <option value="POOR">Poor</option>
+                </select>
+            </div>
+            <button id="catalog-btn" disabled>Catalog This Release</button>
+            <button onclick="resetForm()">Another Image</button>
+        </div>
+
+        <!-- Stats -->
+        <div id="catalog-stats" style="display:none;">
+            <p><strong>Albums cataloged:</strong> <span id="album-count">0</span></p>
+        </div>
+    </div>
+
+    <script>
+        const API = '/';
+        let currentFile = null;
+        let candidates  = [];
+        let selectedMbid = null;
+
+        const dropZone  = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop',     async e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+        dropZone.addEventListener('click',    () => fileInput.click());
+        fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+        document.getElementById('fb-search-btn').addEventListener('click', doFallbackSearch);
+        document.getElementById('fb-artist').addEventListener('keydown', e => { if (e.key === 'Enter') doFallbackSearch(); });
+        document.getElementById('fb-title').addEventListener('keydown', e => { if (e.key === 'Enter') doFallbackSearch(); });
+
+        let progressTimer = null;
+
+        function escapeHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function fmtPct(v) {
+            if (v == null) return '';
+            return Math.round(v * 100) + '% match';
+        }
+
+        function startProgress() {
+            const fill = document.getElementById('progress-fill');
+            const label = document.getElementById('progress-label');
+            const steps = ['step-analyze', 'step-search', 'step-rank', 'step-done'];
+            fill.style.width = '0%';
+            steps.forEach(id => document.getElementById(id).className = 'step');
+            document.getElementById('progress-container').style.display = 'block';
+            label.textContent = 'Analyzing cover art...';
+            document.getElementById(steps[0]).className = 'step active';
+
+            if (progressTimer) clearInterval(progressTimer);
+            progressTimer = setTimeout(() => {
+                fill.style.width = '35%';
+                label.textContent = 'Searching MusicBrainz...';
+                document.getElementById(steps[1]).className = 'step active';
+            }, 2000);
+            progressTimer = setTimeout(() => {
+                fill.style.width = '65%';
+                label.textContent = 'Finding best matches...';
+                document.getElementById(steps[2]).className = 'step active';
+            }, 4000);
+        }
+
+        function completeProgress() {
+            const fill = document.getElementById('progress-fill');
+            const label = document.getElementById('progress-label');
+            const steps = ['step-analyze', 'step-search', 'step-rank', 'step-done'];
+            fill.style.width = '100%';
+            label.textContent = 'Done!';
+            steps.forEach(id => document.getElementById(id).className = 'step done');
+            if (progressTimer) clearInterval(progressTimer);
+        }
+
+        async function fileToB64(file) {
+            return new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = ev => resolve(ev.target.result);
+                r.onerror = reject;
+                r.readAsDataURL(file);
+            });
+        }
+
+        async function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) { alert('Please drop an image'); return; }
+            resetForm();
+            currentFile = file;
+            const b64 = await fileToB64(file);
+            document.getElementById('preview-image').src = b64;
+            document.getElementById('preview-container').style.display = 'block';
+            startProgress();
+            try {
+                const formData = new FormData();
+                formData.append('image', file);
+                const resp = await fetch(API + 'search', { method: 'POST', body: formData });
+                if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || resp.statusText); }
+                const data = await resp.json();
+                completeProgress();
+                handleSearchResponse(data);
+            } catch(err) {
+                completeProgress();
+                const r = document.getElementById('search-results');
+                r.style.display = 'block';
+                r.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        function handleSearchResponse(data) {
+            document.getElementById('fallback-search').style.display = 'none';
+            if (data.message) {
+                document.getElementById('fallback-message').textContent = data.message;
+            }
+            if (data.fallback && (!data.candidates || data.candidates.length === 0)) {
+                document.getElementById('fallback-search').style.display = 'block';
+                document.getElementById('fb-artist').focus();
+                return;
+            }
+            showCandidates(data.candidates || []);
+        }
+
+        function showCandidates(list) {
+            candidates = list;
+            selectedMbid = null;
+            document.getElementById('catalog-btn').disabled = true;
+            const resDiv = document.getElementById('search-results');
+            if (list.length === 0) {
+                resDiv.innerHTML = '<div class="error">No matching releases found.</div>';
+                resDiv.style.display = 'block';
+                return;
+            }
+            const fromIndex = list.some(c => c.from_index);
+            const header = fromIndex ? 'Found in your collection:' : 'Select the matching release:';
+            resDiv.innerHTML = `<h3 style="margin-bottom:15px;">${header}</h3>`;
+            list.forEach(c => {
+                const row = document.createElement('div');
+                row.className = 'candidate-row';
+                row.dataset.mbid = c.mbid;
+                row.onclick = () => selectCandidate(row, c.mbid);
+                const img = document.createElement('img');
+                img.className = 'candidate-thumb';
+                img.alt = 'cover';
+                img.onerror = () => { img.style.display = 'none'; };
+                img.src = c.cover_url;
+                row.innerHTML = '';
+                row.appendChild(img);
+                const badge = c.from_index
+                    ? `<span class="index-badge">From your collection</span>`
+                    : '';
+                const pct = c.similarity
+                    ? `<span class="match-pct">${fmtPct(c.similarity)}</span>`
+                    : '';
+                row.innerHTML += `
+                    <div class="candidate-info">
+                        <div class="candidate-artist">${escapeHtml(c.artist)}${badge}</div>
+                        <div class="candidate-title">${escapeHtml(c.title)}</div>
+                        <div class="candidate-year">${escapeHtml(c.year || '\u2013')}${pct}</div>
+                    </div>
+                    <span class="selected-label" style="display:none;">\u2713 Selected</span>
+                `;
+                resDiv.appendChild(row);
+            });
+            resDiv.style.display = 'block';
+        }
+
+        function selectCandidate(el, mbid) {
+            document.querySelectorAll('.candidate-row').forEach(r => {
+                r.classList.remove('selected');
+                r.querySelector('.selected-label').style.display = 'none';
+            });
+            el.classList.add('selected');
+            el.querySelector('.selected-label').style.display = 'inline';
+            selectedMbid = mbid;
+            document.getElementById('catalog-btn').disabled = false;
+            const sel = candidates.find(c => c.mbid === mbid);
+            if (sel) {
+                const grid = document.getElementById('metadata-grid');
+                grid.innerHTML = '';
+                const rows = [
+                    ['Artist', sel.artist],
+                    ['Title',  sel.title],
+                    ['Year',   sel.year || 'Unknown'],
+                    ['Match',  sel.similarity ? fmtPct(sel.similarity) : '\u2014'],
+                    ['MBID',   sel.mbid],
+                ];
+                rows.forEach(([lbl, val]) => {
+                    grid.innerHTML += `<div class="metadata-item"><span class="label">${lbl}</span><div class="value">${escapeHtml(String(val))}</div></div>`;
+                });
+                document.getElementById('metadata-display').style.display = 'block';
+            }
+        }
+
+        async function doFallbackSearch() {
+            const artist = document.getElementById('fb-artist').value.trim();
+            const title  = document.getElementById('fb-title').value.trim();
+            if (!artist && !title) return;
+            document.getElementById('fb-error').style.display = 'none';
+            document.getElementById('fb-search-btn').disabled = true;
+            try {
+                const formData = new FormData();
+                formData.append('artist', artist);
+                formData.append('title', title);
+                const resp = await fetch(API + 'search-text', { method: 'POST', body: formData });
+                if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || resp.statusText); }
+                const data = await resp.json();
+                document.getElementById('fallback-search').style.display = 'none';
+                showCandidates(data.candidates || []);
+            } catch(err) {
+                document.getElementById('fb-error').textContent = err.message;
+                document.getElementById('fb-error').style.display = 'block';
+            } finally {
+                document.getElementById('fb-search-btn').disabled = false;
+            }
+        }
+
+        document.getElementById('catalog-btn').addEventListener('click', async () => {
+            if (!selectedMbid || !currentFile) return;
+            const sel = candidates.find(c => c.mbid === selectedMbid);
+            if (!sel) return;
+            const formData = new FormData();
+            formData.append('image', currentFile);
+            formData.append('artist', sel.artist);
+            formData.append('title', sel.title);
+            formData.append('mbid', sel.mbid);
+            formData.append('cover_url', sel.cover_url || '');
+            formData.append('condition', document.getElementById('condition').value);
+            formData.append('notes', document.getElementById('notes').value);
+            try {
+                const r = await fetch(API + 'upload', { method: 'POST', body: formData });
+                if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
+                const result = await r.json();
+                alert('Album cataloged!');
+                document.getElementById('catalog-stats').style.display = 'block';
+                const cnt = parseInt(document.getElementById('album-count').textContent || '0') + 1;
+                document.getElementById('album-count').textContent = cnt;
+                document.getElementById('catalog-btn').disabled = true;
+            } catch(err) {
+                alert(err.message);
+            }
+        });
+
+        function resetForm() {
+            currentFile = null;
+            candidates  = [];
+            selectedMbid = null;
+            document.getElementById('metadata-display').style.display = 'none';
+            document.getElementById('search-results').style.display = 'none';
+            document.getElementById('search-results').innerHTML = '';
+            document.getElementById('fallback-search').style.display = 'none';
+            document.getElementById('preview-container').style.display = 'none';
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('drop-zone').style.display = 'block';
+            document.getElementById('catalog-btn').disabled = true;
+            document.getElementById('notes').value = '';
+            document.getElementById('condition').value = 'NM';
+            if (progressTimer) clearInterval(progressTimer);
+        }
+    </script>
+</body>
+</html>
