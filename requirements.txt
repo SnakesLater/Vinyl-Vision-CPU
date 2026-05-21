@@ -6,3 +6,5 @@ transformers>=4.48
 torch>=2.5
 torchvision>=0.20
 Pillow>=10.0
+# Note: In Docker, CPU-only torch is installed first via --index-url
+# in Dockerfile. Native install pulls CUDA version automatically.
